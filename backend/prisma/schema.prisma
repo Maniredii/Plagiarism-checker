@@ -1,0 +1,131 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  STUDENT
+  INSTRUCTOR
+  ADMINISTRATOR
+}
+
+enum DocumentStatus {
+  UPLOADED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  firstName String
+  lastName  String
+  role      UserRole @default(STUDENT)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  documents Document[]
+  reports   Report[]
+
+  @@map("users")
+}
+
+model Document {
+  id           String         @id @default(cuid())
+  filename     String
+  originalName String
+  mimeType     String
+  size         Int
+  content      String?        // Extracted text content
+  status       DocumentStatus @default(UPLOADED)
+  uploadedAt   DateTime       @default(now())
+  processedAt  DateTime?
+
+  // Relations
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Document can be the subject of multiple reports
+  subjectReports Report[] @relation("SubjectDocument")
+
+  // Document can be found as a match in multiple similarity matches
+  similarityMatches SimilarityMatch[] @relation("MatchDocument")
+
+  @@map("documents")
+}
+
+model Report {
+  id                String   @id @default(cuid())
+  overallSimilarity Float    // Overall similarity percentage (0-100)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  subjectDocumentId String
+  subjectDocument   Document @relation("SubjectDocument", fields: [subjectDocumentId], references: [id], onDelete: Cascade)
+
+  // Individual similarity matches
+  matches SimilarityMatch[]
+
+  @@map("reports")
+}
+
+model SimilarityMatch {
+  id                 String  @id @default(cuid())
+  similarity         Float   // Similarity percentage for this specific match
+  matchedText        String  // The text that was found to be similar
+  sourceText         String  // The original text from the source
+  startPosition      Int     // Start position in the subject document
+  endPosition        Int     // End position in the subject document
+  sourceStartPos     Int?    // Start position in the source document
+  sourceEndPos       Int?    // End position in the source document
+  sourceType         String  // "document", "web", "database"
+  sourceUrl          String? // URL if from web source
+  sourceTitle        String? // Title of the source
+  sourceAuthor       String? // Author of the source
+  confidence         Float   // Confidence score of the match
+
+  // Relations
+  reportId String
+  report   Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  matchDocumentId String?
+  matchDocument   Document? @relation("MatchDocument", fields: [matchDocumentId], references: [id], onDelete: SetNull)
+
+  @@map("similarity_matches")
+}
+
+model ProcessingQueue {
+  id           String   @id @default(cuid())
+  documentId   String   @unique
+  status       String   // "pending", "processing", "completed", "failed"
+  priority     Int      @default(0)
+  attempts     Int      @default(0)
+  maxAttempts  Int      @default(3)
+  errorMessage String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("processing_queue")
+}
+
+model SystemSettings {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String
+
+  @@map("system_settings")
+}
