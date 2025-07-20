@@ -1,5 +1,5 @@
 **The project not fully developed**
-**-**
+**Traing data will accepted by creating a pull request**
 # Plagiarism Detection System
 
 A comprehensive plagiarism detection system that replicates core Turnitin functionality with modern web technologies.
